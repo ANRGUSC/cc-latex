@@ -1,0 +1,131 @@
+\documentclass[11pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{microtype}
+
+\geometry{margin=1in}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+
+\title{Exploring the Foundations of Mathematical Analysis}
+\author{cc-latex Demo Project}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This document demonstrates the capabilities of the cc-latex IDE, including
+multi-file projects, mathematical typesetting, tables, cross-references,
+and bibliography management. Edit any file in the tree on the left, or ask
+the AI assistant below for help writing your next paper.
+\end{abstract}
+
+\tableofcontents
+
+\input{introduction}
+
+\section{Mathematical Typesetting}
+
+One of \LaTeX's greatest strengths is its ability to render complex mathematics
+with precision and clarity.
+
+\subsection{Equations}
+
+The Euler--Lagrange equation governs the calculus of variations:
+\begin{equation}
+  \frac{\partial \mathcal{L}}{\partial q} - \frac{d}{dt}\frac{\partial \mathcal{L}}{\partial \dot{q}} = 0
+  \label{eq:euler-lagrange}
+\end{equation}
+
+A particularly elegant identity connects five fundamental constants:
+\begin{equation}
+  e^{i\pi} + 1 = 0
+  \label{eq:euler}
+\end{equation}
+
+\subsection{Theorems}
+
+\begin{theorem}[Fundamental Theorem of Calculus]
+  Let $f$ be a continuous function on $[a, b]$ and let $F$ be an antiderivative
+  of $f$. Then
+  \[
+    \int_a^b f(x) \, dx = F(b) - F(a).
+  \]
+\end{theorem}
+
+\begin{lemma}
+  For any $n \times n$ matrix $A$,
+  \[
+    \det(A^T) = \det(A).
+  \]
+\end{lemma}
+
+\subsection{Aligned Equations}
+
+Maxwell's equations in differential form:
+\begin{align}
+  \nabla \cdot \mathbf{E}  &= \frac{\rho}{\varepsilon_0}          \label{eq:gauss} \\
+  \nabla \cdot \mathbf{B}  &= 0                                    \label{eq:gauss-mag} \\
+  \nabla \times \mathbf{E} &= -\frac{\partial \mathbf{B}}{\partial t} \label{eq:faraday} \\
+  \nabla \times \mathbf{B} &= \mu_0 \mathbf{J} + \mu_0 \varepsilon_0 \frac{\partial \mathbf{E}}{\partial t} \label{eq:ampere}
+\end{align}
+
+\section{Tables and Figures}
+
+Table~\ref{tab:complexity} summarizes the time complexity of common sorting algorithms.
+
+\begin{table}[ht]
+  \centering
+  \caption{Comparison of sorting algorithm complexities}
+  \label{tab:complexity}
+  \begin{tabular}{@{} l c c c @{}}
+    \toprule
+    Algorithm      & Best Case        & Average Case     & Worst Case       \\
+    \midrule
+    Merge Sort     & $O(n \log n)$    & $O(n \log n)$    & $O(n \log n)$    \\
+    Quick Sort     & $O(n \log n)$    & $O(n \log n)$    & $O(n^2)$         \\
+    Heap Sort      & $O(n \log n)$    & $O(n \log n)$    & $O(n \log n)$    \\
+    Insertion Sort & $O(n)$           & $O(n^2)$         & $O(n^2)$         \\
+    Bubble Sort    & $O(n)$           & $O(n^2)$         & $O(n^2)$         \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Cross-References}
+
+As shown in Equation~\ref{eq:euler-lagrange}, variational principles are
+foundational in physics. Gauss's law (Equation~\ref{eq:gauss}) is the first
+of Maxwell's equations. The sorting complexities in Table~\ref{tab:complexity}
+highlight the efficiency of divide-and-conquer approaches.
+
+\section{Conclusion}
+
+This demo project showcases multi-file \LaTeX{} editing with cc-latex.
+Try editing this file or \texttt{introduction.tex}, then compile with
+\textbf{Ctrl+Shift+B} to see the result. Use the AI chat below for help
+writing, formatting, or debugging your documents.
+
+For more on \LaTeX{} best practices, see Knuth~\cite{knuth1984} and
+Lamport~\cite{lamport1994}. Online resources like the Overleaf
+documentation~\cite{overleaf2024} are also excellent references.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

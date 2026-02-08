@@ -1,0 +1,23 @@
+{
+  "name": "cc-latex-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "ws": "^8.18.0",
+    "chokidar": "^4.0.0",
+    "@anthropic-ai/sdk": "^0.39.0",
+    "cc-latex-shared": "*"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/ws": "^8.5.0",
+    "@types/cors": "^2.8.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

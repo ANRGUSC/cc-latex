@@ -1,0 +1,27 @@
+node_modules/
+dist/
+*.pdf
+.env
+*.aux
+*.log
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.out
+*.toc
+*.lof
+*.lot
+*.bbl
+*.blg
+
+# User project data
+project/
+
+# Claude Code local config
+.claude/
+
+# Test artifacts
+test_*
+
+# Windows artifact
+nul
