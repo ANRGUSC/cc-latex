@@ -28,6 +28,8 @@ interface AppState {
 
   projectName: string;
   setProjectName: (name: string) => void;
+  projectDir: string;
+  setProjectDir: (dir: string) => void;
 
   vimMode: boolean;
   toggleVimMode: () => void;
@@ -107,6 +109,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   projectName: 'cc-latex',
   setProjectName: (name) => set({ projectName: name }),
+  projectDir: '',
+  setProjectDir: (dir) => set({ projectDir: dir }),
 
   vimMode: loadPersisted('cc-latex-vim-mode', true),
   toggleVimMode: () =>

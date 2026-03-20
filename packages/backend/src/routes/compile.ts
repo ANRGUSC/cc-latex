@@ -4,7 +4,7 @@ import { WebSocketServer } from 'ws';
 import { compileLaTeX } from '../services/compileService.js';
 import { broadcast } from '../websocket.js';
 
-export function compileRouter(projectDir: string, wss: WebSocketServer): Router {
+export function compileRouter(projectState: { dir: string }, wss: WebSocketServer): Router {
   const router = Router();
 
   // POST /compile — compile LaTeX and broadcast progress via WebSocket
@@ -14,7 +14,7 @@ export function compileRouter(projectDir: string, wss: WebSocketServer): Router 
     try {
       broadcast(wss, { type: 'compilation:start' });
 
-      const result = await compileLaTeX(projectDir, mainFile);
+      const result = await compileLaTeX(projectState.dir, mainFile);
 
       broadcast(wss, { type: 'compilation:complete', data: result });
 
@@ -50,7 +50,7 @@ export function compileRouter(projectDir: string, wss: WebSocketServer): Router 
       return;
     }
 
-    const pdfPath = path.resolve(projectDir, pdfName);
+    const pdfPath = path.resolve(projectState.dir, pdfName);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.sendFile(pdfPath, (err) => {

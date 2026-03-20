@@ -36,13 +36,13 @@ function handlePathError(err: unknown, res: Response): void {
   res.status(500).json({ error: message });
 }
 
-export function filesRouter(projectDir: string): Router {
+export function filesRouter(projectState: { dir: string }): Router {
   const router = Router();
 
   // GET / — return file tree
   router.get('/', (_req: Request, res: Response) => {
     try {
-      const tree = buildFileTree(projectDir);
+      const tree = buildFileTree(projectState.dir);
       res.json(tree);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to read file tree';
@@ -60,9 +60,9 @@ export function filesRouter(projectDir: string): Router {
 
     try {
       if (type === 'directory') {
-        createDirectory(projectDir, filePath);
+        createDirectory(projectState.dir, filePath);
       } else {
-        writeFile(projectDir, filePath, content || '');
+        writeFile(projectState.dir, filePath, content || '');
       }
       res.json({ success: true });
     } catch (err) {
@@ -79,7 +79,7 @@ export function filesRouter(projectDir: string): Router {
     }
 
     try {
-      const content = readFile(projectDir, relativePath);
+      const content = readFile(projectState.dir, relativePath);
       res.json({ content });
     } catch (err) {
       handlePathError(err, res);
@@ -101,7 +101,7 @@ export function filesRouter(projectDir: string): Router {
     }
 
     try {
-      writeFile(projectDir, relativePath, content);
+      writeFile(projectState.dir, relativePath, content);
       res.json({ success: true });
     } catch (err) {
       handlePathError(err, res);
@@ -117,7 +117,7 @@ export function filesRouter(projectDir: string): Router {
     }
 
     try {
-      deleteFile(projectDir, relativePath);
+      deleteFile(projectState.dir, relativePath);
       res.json({ success: true });
     } catch (err) {
       handlePathError(err, res);
@@ -139,7 +139,7 @@ export function filesRouter(projectDir: string): Router {
     }
 
     try {
-      renameFile(projectDir, relativePath, newName);
+      renameFile(projectState.dir, relativePath, newName);
       res.json({ success: true });
     } catch (err) {
       handlePathError(err, res);

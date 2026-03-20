@@ -10,15 +10,19 @@ import { compileRouter } from './routes/compile.js';
 import { chatRouter } from './routes/chat.js';
 import { gitRouter } from './routes/git.js';
 import { setupWebSocket } from './websocket.js';
-import { setupWatcher } from './watcher.js';
+import { setupWatcher, stopWatcher } from './watcher.js';
 import { startStatusPolling } from './services/gitService.js';
+import { buildFileTree } from './services/fileService.js';
 
-const PROJECT_DIR = process.env.PROJECT_DIR || path.resolve(process.cwd(), 'project');
+// Mutable project directory — can be changed at runtime via /api/project
+const projectState = {
+  dir: process.env.PROJECT_DIR || path.resolve(process.cwd(), 'project'),
+};
 
 // Ensure project directory exists
-if (!fs.existsSync(PROJECT_DIR)) {
-  fs.mkdirSync(PROJECT_DIR, { recursive: true });
-  console.log(`Created project directory: ${PROJECT_DIR}`);
+if (!fs.existsSync(projectState.dir)) {
+  fs.mkdirSync(projectState.dir, { recursive: true });
+  console.log(`Created project directory: ${projectState.dir}`);
 }
 
 // Probe Claude CLI availability once at startup
@@ -32,6 +36,10 @@ try {
 
 const app = express();
 const server = createServer(app);
+
+// WebSocket server — must be created before route mounts that reference it
+const wss = new WebSocketServer({ server, path: '/ws' });
+setupWebSocket(wss);
 
 // CORS — allow frontend dev server
 app.use(cors({
@@ -47,31 +55,79 @@ app.get('/api/status', (_req, res) => {
   res.json({ claudeCliAvailable });
 });
 
-// Mount routes
-app.use('/api/files', filesRouter(PROJECT_DIR));
+// Project directory management
+app.get('/api/project', (_req, res) => {
+  res.json({
+    dir: projectState.dir,
+    name: path.basename(projectState.dir),
+  });
+});
 
-// WebSocket server
-const wss = new WebSocketServer({ server, path: '/ws' });
-setupWebSocket(wss);
+app.post('/api/project', (req, res) => {
+  const { dir } = req.body;
+  if (!dir || typeof dir !== 'string') {
+    res.status(400).json({ error: 'dir is required' });
+    return;
+  }
 
-// Mount compile, chat, and git routes
-app.use('/api', compileRouter(PROJECT_DIR, wss));
-app.use('/api', chatRouter(PROJECT_DIR));
-app.use('/api', gitRouter(PROJECT_DIR, wss));
+  const resolved = path.resolve(dir);
+
+  // Create if it doesn't exist
+  if (!fs.existsSync(resolved)) {
+    try {
+      fs.mkdirSync(resolved, { recursive: true });
+    } catch (err) {
+      res.status(400).json({ error: `Cannot create directory: ${err instanceof Error ? err.message : err}` });
+      return;
+    }
+  }
+
+  // Switch project dir
+  projectState.dir = resolved;
+  console.log(`[PROJECT] Switched to: ${resolved}`);
+
+  // Re-setup file watcher
+  stopWatcher();
+  setupWatcher(projectState.dir, wss);
+
+  // Re-start git polling
+  startStatusPolling(projectState.dir, wss);
+
+  // Send back updated file tree
+  try {
+    const tree = buildFileTree(projectState.dir);
+    const msg = JSON.stringify({ type: 'file:tree-updated', data: tree });
+    for (const client of wss.clients) {
+      if (client.readyState === 1) client.send(msg);
+    }
+  } catch { /* ignore */ }
+
+  res.json({
+    success: true,
+    dir: resolved,
+    name: path.basename(resolved),
+  });
+});
+
+// Mount routes — routers use projectState.dir via getter
+app.use('/api/files', filesRouter(projectState));
+app.use('/api', compileRouter(projectState, wss));
+app.use('/api', chatRouter(projectState));
+app.use('/api', gitRouter(projectState, wss));
 
 // File watcher
-setupWatcher(PROJECT_DIR, wss);
+setupWatcher(projectState.dir, wss);
 
 // Start git status polling
-startStatusPolling(PROJECT_DIR, wss);
+startStatusPolling(projectState.dir, wss);
 
 // Start server
 const PORT = 3100;
 server.listen(PORT, () => {
   console.log(`Backend server listening on http://localhost:${PORT}`);
-  console.log(`PROJECT_DIR: ${PROJECT_DIR}`);
+  console.log(`PROJECT_DIR: ${projectState.dir}`);
   console.log(`WebSocket available at ws://localhost:${PORT}/ws`);
   console.log(`Claude CLI: ${claudeCliAvailable ? 'available' : 'not found'}`);
 });
 
-export { wss };
+export { wss, projectState };

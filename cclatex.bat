@@ -1,6 +1,8 @@
 @echo off
 REM cclatex — launch the cc-latex web-based LaTeX IDE
-REM Usage: cclatex [project-directory]
+REM Usage: cclatex [options] [project-directory]
+REM   --dir <path>        Local project directory (default: ./project)
+REM   --repo <owner/repo> Clone a GitHub repo into the project directory
 REM
 REM Prerequisites: Node.js 18+, npm
 REM Optional: pdflatex (MiKTeX/TeX Live), claude CLI, git, gh

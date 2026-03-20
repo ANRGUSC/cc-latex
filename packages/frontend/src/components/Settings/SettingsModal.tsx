@@ -1,6 +1,8 @@
-import { X, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { X, Eye, EyeOff, Trash2, FolderOpen, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { switchProject, fetchFileTree, fetchProject, gitClone, fetchGitStatus } from '../../api/client';
+import { useToastStore } from '../../stores/toastStore';
 
 interface Props {
   onClose: () => void;
@@ -18,8 +20,71 @@ export default function SettingsModal({ onClose }: Props) {
   const toggleAutoCompile = useAppStore((s) => s.toggleAutoCompile);
   const vimMode = useAppStore((s) => s.vimMode);
   const toggleVimMode = useAppStore((s) => s.toggleVimMode);
+  const projectDir = useAppStore((s) => s.projectDir);
+  const setProjectDir = useAppStore((s) => s.setProjectDir);
+  const setProjectName = useAppStore((s) => s.setProjectName);
+  const setFileTree = useAppStore((s) => s.setFileTree);
+  const setGitInfo = useAppStore((s) => s.setGitInfo);
 
   const [showKey, setShowKey] = useState(false);
+  const [dirInput, setDirInput] = useState(projectDir);
+  const [isSwitching, setIsSwitching] = useState(false);
+  const [repoInput, setRepoInput] = useState('');
+  const [isCloning, setIsCloning] = useState(false);
+
+  async function handleSwitchProject() {
+    const trimmed = dirInput.trim();
+    if (!trimmed || trimmed === projectDir) return;
+    setIsSwitching(true);
+    try {
+      const result = await switchProject(trimmed);
+      setProjectDir(result.dir);
+      setProjectName(result.name);
+      setDirInput(result.dir);
+      // Refresh file tree
+      const tree = await fetchFileTree();
+      setFileTree(tree);
+      // Refresh git status
+      try {
+        const gitInfo = await fetchGitStatus();
+        setGitInfo(gitInfo);
+      } catch { /* no git */ }
+      useToastStore.getState().addToast({ message: `Switched to ${result.name}`, type: 'success' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to switch project';
+      useToastStore.getState().addToast({ message: msg, type: 'error' });
+    } finally {
+      setIsSwitching(false);
+    }
+  }
+
+  async function handleCloneRepo() {
+    const trimmed = repoInput.trim();
+    if (!trimmed.includes('/')) return;
+    const [owner, repo] = trimmed.split('/');
+    setIsCloning(true);
+    try {
+      const result = await gitClone(owner, repo);
+      if (result.success) {
+        useToastStore.getState().addToast({ message: result.message, type: 'success' });
+        setRepoInput('');
+        // Refresh file tree and git status
+        const tree = await fetchFileTree();
+        setFileTree(tree);
+        try {
+          const gitInfo = await fetchGitStatus();
+          setGitInfo(gitInfo);
+        } catch { /* ignore */ }
+      } else {
+        useToastStore.getState().addToast({ message: result.message, type: 'error' });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Clone failed';
+      useToastStore.getState().addToast({ message: msg, type: 'error' });
+    } finally {
+      setIsCloning(false);
+    }
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -29,6 +94,67 @@ export default function SettingsModal({ onClose }: Props) {
           <button className="btn-icon" onClick={onClose}>
             <X size={16} />
           </button>
+        </div>
+
+        {/* Project Directory */}
+        <div className="modal-section">
+          <div className="modal-section-title">Project Directory</div>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <FolderOpen size={14} style={{ flexShrink: 0, opacity: 0.6 }} />
+            <input
+              type="text"
+              value={dirInput}
+              onChange={(e) => setDirInput(e.target.value)}
+              placeholder="/path/to/project"
+              style={{ flex: 1, fontSize: 12 }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSwitchProject();
+                }
+              }}
+            />
+            <button
+              className="btn-sm"
+              disabled={isSwitching || dirInput === projectDir || !dirInput.trim()}
+              onClick={handleSwitchProject}
+            >
+              {isSwitching ? <Loader2 size={12} className="spin" /> : 'Switch'}
+            </button>
+          </div>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+            Current: {projectDir || '(unknown)'}
+          </span>
+        </div>
+
+        {/* GitHub Repo */}
+        <div className="modal-section">
+          <div className="modal-section-title">Clone GitHub Repo</div>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <input
+              type="text"
+              value={repoInput}
+              onChange={(e) => setRepoInput(e.target.value)}
+              placeholder="owner/repo"
+              style={{ flex: 1, fontSize: 12 }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleCloneRepo();
+                }
+              }}
+            />
+            <button
+              className="btn-sm"
+              disabled={isCloning || !repoInput.includes('/')}
+              onClick={handleCloneRepo}
+            >
+              {isCloning ? <Loader2 size={12} className="spin" /> : 'Clone'}
+            </button>
+          </div>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+            Clones into the current project directory. Replaces existing files.
+          </span>
         </div>
 
         {/* AI Mode */}

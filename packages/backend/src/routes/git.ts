@@ -9,13 +9,13 @@ import {
   pull,
 } from '../services/gitService.js';
 
-export function gitRouter(projectDir: string, wss: WebSocketServer): Router {
+export function gitRouter(projectState: { dir: string }, wss: WebSocketServer): Router {
   const router = Router();
 
   // Broadcast git status to all WebSocket clients
   async function broadcastStatus() {
     try {
-      const info = await getRepoInfo(projectDir);
+      const info = await getRepoInfo(projectState.dir);
       const msg = JSON.stringify({ type: 'git:status-updated', data: info });
       for (const client of wss.clients) {
         if (client.readyState === 1) client.send(msg);
@@ -31,7 +31,7 @@ export function gitRouter(projectDir: string, wss: WebSocketServer): Router {
   // GET /git/status — current repo info
   router.get('/git/status', async (_req: Request, res: Response) => {
     try {
-      const info = await getRepoInfo(projectDir);
+      const info = await getRepoInfo(projectState.dir);
       res.json(info);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to get git status';
@@ -47,8 +47,8 @@ export function gitRouter(projectDir: string, wss: WebSocketServer): Router {
       return;
     }
     try {
-      await cloneRepo(projectDir, owner, repo, branch);
-      const status = await getRepoInfo(projectDir);
+      await cloneRepo(projectState.dir, owner, repo, branch);
+      const status = await getRepoInfo(projectState.dir);
       broadcastStatus();
       res.json({ success: true, message: `Cloned ${owner}/${repo}`, status });
     } catch (err) {
@@ -65,8 +65,8 @@ export function gitRouter(projectDir: string, wss: WebSocketServer): Router {
       return;
     }
     try {
-      await commitAndPush(projectDir, message);
-      const status = await getRepoInfo(projectDir);
+      await commitAndPush(projectState.dir, message);
+      const status = await getRepoInfo(projectState.dir);
       broadcastStatus();
       res.json({ success: true, message: 'Pushed successfully', status });
     } catch (err) {
@@ -78,8 +78,8 @@ export function gitRouter(projectDir: string, wss: WebSocketServer): Router {
   // POST /git/pull — pull latest from remote
   router.post('/git/pull', async (_req: Request, res: Response) => {
     try {
-      await pull(projectDir);
-      const status = await getRepoInfo(projectDir);
+      await pull(projectState.dir);
+      const status = await getRepoInfo(projectState.dir);
       broadcastStatus();
       res.json({ success: true, message: 'Pulled successfully', status });
     } catch (err) {

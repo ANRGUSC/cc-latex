@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAppStore } from './stores/appStore';
-import { fetchFileTree, saveFile, compile, fetchStatus } from './api/client';
+import { fetchFileTree, saveFile, compile, fetchStatus, fetchProject } from './api/client';
 import MainLayout from './components/Layout/MainLayout';
 import ToastContainer from './components/Toast/ToastContainer';
 import SettingsModal from './components/Settings/SettingsModal';
@@ -19,6 +19,8 @@ export default function App() {
   const setDirty = useAppStore((s) => s.setDirty);
   const theme = useAppStore((s) => s.theme);
   const setClaudeCliAvailable = useAppStore((s) => s.setClaudeCliAvailable);
+  const setProjectName = useAppStore((s) => s.setProjectName);
+  const setProjectDir = useAppStore((s) => s.setProjectDir);
   const showSettings = useAppStore((s) => s.showSettings);
   const setShowSettings = useAppStore((s) => s.setShowSettings);
 
@@ -35,6 +37,13 @@ export default function App() {
       .then(setFileTree)
       .catch((err) => console.error('Failed to load file tree:', err));
 
+    fetchProject()
+      .then((project) => {
+        setProjectName(project.name);
+        setProjectDir(project.dir);
+      })
+      .catch(() => {});
+
     fetchStatus()
       .then((status) => {
         setClaudeCliAvailable(status.claudeCliAvailable);
@@ -49,7 +58,7 @@ export default function App() {
       .catch(() => {
         // Status endpoint not available, CLI assumed unavailable
       });
-  }, [setFileTree, setClaudeCliAvailable]);
+  }, [setFileTree, setClaudeCliAvailable, setProjectName, setProjectDir]);
 
   const handleSave = useCallback(async () => {
     if (!activeFilePath || !isDirty) return;

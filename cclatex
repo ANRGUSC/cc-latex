@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # cclatex — launch the cc-latex web-based LaTeX IDE
-# Usage: ./cclatex [project-directory]
+# Usage: ./cclatex [options] [project-directory]
+#   --dir <path>        Local project directory (default: ./project)
+#   --repo <owner/repo> Clone a GitHub repo into the project directory
 #
 # Prerequisites: Node.js 18+, npm
 # Optional: pdflatex (MiKTeX/TeX Live), claude CLI, git, gh

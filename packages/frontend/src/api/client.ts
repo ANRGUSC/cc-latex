@@ -81,6 +81,26 @@ export async function renameFileOrDir(filePath: string, newName: string): Promis
   }
 }
 
+// Project management
+export async function fetchProject(): Promise<{ dir: string; name: string }> {
+  const res = await fetch('/api/project');
+  if (!res.ok) throw new Error('Failed to fetch project info');
+  return res.json();
+}
+
+export async function switchProject(dir: string): Promise<{ success: boolean; dir: string; name: string }> {
+  const res = await fetch('/api/project', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dir }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(data.error || res.statusText);
+  }
+  return res.json();
+}
+
 // Git operations
 export async function fetchGitCheck(): Promise<{ gitAvailable: boolean; ghAvailable: boolean }> {
   const res = await fetch('/api/git/check');

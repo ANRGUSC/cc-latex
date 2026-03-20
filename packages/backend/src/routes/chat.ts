@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { streamChat, streamChatWithApiKey } from '../services/chatService.js';
 
-export function chatRouter(projectDir: string): Router {
+export function chatRouter(projectState: { dir: string }): Router {
   const router = Router();
 
   // POST /chat — stream AI response via SSE

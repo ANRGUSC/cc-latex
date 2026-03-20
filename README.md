@@ -58,17 +58,30 @@ cclatex.bat
 
 The launcher script installs dependencies if needed, starts the backend (port 3100) and frontend (port 5210), and opens your browser with a demo project loaded.
 
-To open an existing LaTeX project:
+### Options
+
+```
+./cclatex [options] [project-directory]
+
+  --dir <path>         Local project directory (default: ./project)
+  --repo <owner/repo>  Clone a GitHub repo into the project directory
+  -h, --help           Show help
+```
+
+### Examples
 
 ```bash
-./cclatex /path/to/your/project
+./cclatex                                      # Demo project in ./project
+./cclatex ./my-thesis                          # Open existing project
+./cclatex --repo username/my-paper             # Clone repo into ./project
+./cclatex --dir ./papers --repo user/my-paper  # Clone into specific dir
 ```
 
 ### Manual start
 
 ```bash
 npm install
-npm start              # or: npx tsx start.ts [project-dir]
+npm start              # or: npx tsx start.ts [options] [project-dir]
 ```
 
 ## Architecture
@@ -124,11 +137,28 @@ When the AI suggests file edits, they're parsed from structured markers in the r
 |---------|---------|---------------|
 | Backend port | 3100 | Edit `packages/shared/src/constants.ts` |
 | Frontend port | 5210 | Edit `packages/frontend/vite.config.ts` |
-| Project directory | `./project` | Pass as CLI argument: `./cclatex /path` |
+| Project directory | `./project` | CLI argument (`./cclatex /path`) or Settings modal in browser |
 | AI mode | CLI | Settings modal (gear icon in toolbar) |
 | Theme | Dark | Toggle in toolbar (sun/moon icon) or settings |
 | Vim mode | On | Toggle in editor header or settings |
 | Auto-compile | Off | Settings modal |
+
+## Cross-Platform Notes
+
+cc-latex runs on **Windows**, **macOS**, and **Linux**. The backend uses Node.js and spawns `pdflatex`, `git`, and optionally `claude` as child processes — all of which are cross-platform.
+
+| Component | Windows | macOS | Linux |
+|-----------|---------|-------|-------|
+| TeX distribution | [MiKTeX](https://miktex.org/) | [MacTeX](https://tug.org/mactex/) (`brew install --cask mactex`) | TeX Live (`apt install texlive-full`) |
+| Launcher | `cclatex.bat` | `./cclatex` | `./cclatex` |
+| Node.js | Any 18+ install | Any 18+ install | Any 18+ install |
+| Git/gh | Git for Windows | Xcode CLI or `brew install git gh` | `apt install git gh` |
+
+**Path handling:** The backend resolves all file paths with `path.resolve()` and `path.join()`, so forward slashes and backslashes both work. The `pdflatex` fallback detection checks common install locations for each OS.
+
+**pdflatex not on PATH?** On Windows, MiKTeX sometimes doesn't add itself to PATH. The compile service checks `%LOCALAPPDATA%\Programs\MiKTeX\miktex\bin\x64\` as a fallback. On macOS, MacTeX typically installs to `/Library/TeX/texbin/` which is on PATH by default. On Linux, TeX Live packages put `pdflatex` on PATH automatically.
+
+**Shell scripts:** The `cclatex` bash launcher works on macOS and Linux (and Git Bash/WSL on Windows). The `cclatex.bat` launcher is for native Windows cmd/PowerShell.
 
 ## Development
 

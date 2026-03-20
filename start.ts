@@ -2,10 +2,44 @@ import { execSync, spawn, type ChildProcess } from 'child_process';
 import { existsSync, mkdirSync, readdirSync, cpSync } from 'fs';
 import path from 'path';
 
-const args = process.argv.slice(2);
-const projectDir = args[0]
-  ? path.resolve(args[0])
-  : path.resolve(process.cwd(), 'project');
+// Parse CLI arguments
+// Usage: cclatex [options] [project-directory]
+//   --repo owner/repo   Clone/connect a GitHub repo on startup
+//   --dir  /path        Set local project directory (alternative to positional arg)
+//   --help              Show usage
+
+const rawArgs = process.argv.slice(2);
+let projectDir = '';
+let githubRepo = '';
+
+for (let i = 0; i < rawArgs.length; i++) {
+  const arg = rawArgs[i];
+  if (arg === '--help' || arg === '-h') {
+    console.log(`Usage: cclatex [options] [project-directory]
+
+Options:
+  --dir <path>        Local project directory (default: ./project)
+  --repo <owner/repo> Clone a GitHub repo into the project directory on startup
+  -h, --help          Show this help
+
+Examples:
+  cclatex                           # Use ./project with demo
+  cclatex ./my-thesis               # Use ./my-thesis as project dir
+  cclatex --repo user/my-paper      # Clone repo into ./project
+  cclatex --dir ./papers --repo user/my-paper  # Clone into ./papers`);
+    process.exit(0);
+  } else if (arg === '--repo' && rawArgs[i + 1]) {
+    githubRepo = rawArgs[++i];
+  } else if (arg === '--dir' && rawArgs[i + 1]) {
+    projectDir = path.resolve(rawArgs[++i]);
+  } else if (!arg.startsWith('-') && !projectDir) {
+    projectDir = path.resolve(arg);
+  }
+}
+
+if (!projectDir) {
+  projectDir = path.resolve(process.cwd(), 'project');
+}
 
 console.log('=== cc-latex: Web-Based LaTeX IDE ===\n');
 
@@ -84,7 +118,40 @@ if (!existsSync(projectDir)) {
   console.log(`[OK] Created project directory: ${projectDir}`);
 }
 
-// 4. Seed from demo/ if no .tex files exist
+// 4. Clone GitHub repo if --repo specified
+if (githubRepo) {
+  const repoUrl = githubRepo.includes('/')
+    ? `https://github.com/${githubRepo}.git`
+    : githubRepo; // allow full URL too
+  const [owner, repo] = githubRepo.split('/');
+  console.log(`[..] Cloning ${githubRepo} into ${projectDir}...`);
+  try {
+    // If dir is empty or new, clone directly; otherwise init + add remote + pull
+    const isEmpty = !existsSync(projectDir) || readdirSync(projectDir).length === 0;
+    if (isEmpty) {
+      execSync(`git clone "${repoUrl}" "${projectDir}"`, { stdio: 'inherit' });
+    } else {
+      // Directory has content — init and pull
+      if (!existsSync(path.join(projectDir, '.git'))) {
+        execSync('git init', { cwd: projectDir, stdio: 'inherit' });
+      }
+      try {
+        execSync('git remote remove origin', { cwd: projectDir, stdio: 'ignore' });
+      } catch { /* no existing remote */ }
+      execSync(`git remote add origin "${repoUrl}"`, { cwd: projectDir, stdio: 'inherit' });
+      try {
+        execSync('git pull origin main', { cwd: projectDir, stdio: 'inherit' });
+      } catch {
+        execSync('git pull origin master', { cwd: projectDir, stdio: 'inherit' });
+      }
+    }
+    console.log(`[OK] Cloned ${githubRepo}`);
+  } catch (err) {
+    console.error(`[!!] Failed to clone ${githubRepo}. Continuing without it.`);
+  }
+}
+
+// 5. Seed from demo/ if no .tex files exist
 const hasTexFiles = existsSync(projectDir) &&
   readdirSync(projectDir).some(f => f.endsWith('.tex'));
 

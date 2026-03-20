@@ -1,4 +1,4 @@
-import chokidar from 'chokidar';
+import chokidar, { type FSWatcher } from 'chokidar';
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import type { WSMessage } from 'cc-latex-shared';
@@ -22,7 +22,20 @@ const IGNORED_PATTERNS = [
   '**/*.pdf',
 ];
 
+let activeWatcher: FSWatcher | null = null;
+
+export function stopWatcher(): void {
+  if (activeWatcher) {
+    activeWatcher.close();
+    activeWatcher = null;
+    console.log('[Watcher] Stopped');
+  }
+}
+
 export function setupWatcher(projectDir: string, wss: WebSocketServer): void {
+  // Close previous watcher if any
+  stopWatcher();
+
   const watcher = chokidar.watch(projectDir, {
     ignored: IGNORED_PATTERNS,
     persistent: true,
@@ -76,9 +89,10 @@ export function setupWatcher(projectDir: string, wss: WebSocketServer): void {
   watcher.on('addDir', (dirPath) => handleDirEvent('addDir', dirPath));
   watcher.on('unlinkDir', (dirPath) => handleDirEvent('unlinkDir', dirPath));
 
-  watcher.on('error', (err) => {
-    console.error('[Watcher] Error:', err.message);
+  watcher.on('error', (err: unknown) => {
+    console.error('[Watcher] Error:', err instanceof Error ? err.message : err);
   });
 
+  activeWatcher = watcher;
   console.log(`[Watcher] Watching ${projectDir} for changes`);
 }
