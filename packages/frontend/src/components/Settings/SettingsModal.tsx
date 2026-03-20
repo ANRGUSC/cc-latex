@@ -1,8 +1,9 @@
 import { X, Eye, EyeOff, Trash2, FolderOpen, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { switchProject, fetchFileTree, fetchProject, gitClone, fetchGitStatus } from '../../api/client';
+import { switchProject, fetchFileTree, gitClone, fetchGitStatus } from '../../api/client';
 import { useToastStore } from '../../stores/toastStore';
+import FolderPicker from './FolderPicker';
 
 interface Props {
   onClose: () => void;
@@ -27,24 +28,20 @@ export default function SettingsModal({ onClose }: Props) {
   const setGitInfo = useAppStore((s) => s.setGitInfo);
 
   const [showKey, setShowKey] = useState(false);
-  const [dirInput, setDirInput] = useState(projectDir);
   const [isSwitching, setIsSwitching] = useState(false);
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [repoInput, setRepoInput] = useState('');
   const [isCloning, setIsCloning] = useState(false);
 
-  async function handleSwitchProject() {
-    const trimmed = dirInput.trim();
-    if (!trimmed || trimmed === projectDir) return;
+  async function handleSwitchProject(dir: string) {
+    if (!dir || dir === projectDir) return;
     setIsSwitching(true);
     try {
-      const result = await switchProject(trimmed);
+      const result = await switchProject(dir);
       setProjectDir(result.dir);
       setProjectName(result.name);
-      setDirInput(result.dir);
-      // Refresh file tree
       const tree = await fetchFileTree();
       setFileTree(tree);
-      // Refresh git status
       try {
         const gitInfo = await fetchGitStatus();
         setGitInfo(gitInfo);
@@ -99,32 +96,28 @@ export default function SettingsModal({ onClose }: Props) {
         {/* Project Directory */}
         <div className="modal-section">
           <div className="modal-section-title">Project Directory</div>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <FolderOpen size={14} style={{ flexShrink: 0, opacity: 0.6 }} />
-            <input
-              type="text"
-              value={dirInput}
-              onChange={(e) => setDirInput(e.target.value)}
-              placeholder="/path/to/project"
-              style={{ flex: 1, fontSize: 12 }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleSwitchProject();
-                }
-              }}
-            />
+            <span style={{
+              flex: 1,
+              fontSize: 12,
+              color: 'var(--text)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              direction: 'rtl',
+              textAlign: 'left',
+            }}>
+              {projectDir || '(none)'}
+            </span>
             <button
               className="btn-sm"
-              disabled={isSwitching || dirInput === projectDir || !dirInput.trim()}
-              onClick={handleSwitchProject}
+              disabled={isSwitching}
+              onClick={() => setShowFolderPicker(true)}
             >
-              {isSwitching ? <Loader2 size={12} className="spin" /> : 'Switch'}
+              {isSwitching ? <Loader2 size={12} className="spin" /> : 'Browse...'}
             </button>
           </div>
-          <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-            Current: {projectDir || '(unknown)'}
-          </span>
         </div>
 
         {/* GitHub Repo */}
@@ -255,6 +248,17 @@ export default function SettingsModal({ onClose }: Props) {
           Press Ctrl+/ for keyboard shortcuts
         </div>
       </div>
+
+      {showFolderPicker && (
+        <FolderPicker
+          initialDir={projectDir}
+          onCancel={() => setShowFolderPicker(false)}
+          onSelect={(dir) => {
+            setShowFolderPicker(false);
+            handleSwitchProject(dir);
+          }}
+        />
+      )}
     </div>
   );
 }

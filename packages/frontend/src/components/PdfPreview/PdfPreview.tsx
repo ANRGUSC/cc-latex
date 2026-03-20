@@ -48,16 +48,19 @@ export default function PdfPreview() {
 
         // Use devicePixelRatio for sharp rendering
         const dpr = window.devicePixelRatio || 1;
-        canvas.width = viewport.width * dpr;
-        canvas.height = viewport.height * dpr;
-        canvas.style.width = `${viewport.width}px`;
-        canvas.style.height = `${viewport.height}px`;
+        canvas.width = Math.floor(viewport.width * dpr);
+        canvas.height = Math.floor(viewport.height * dpr);
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
 
-        context.setTransform(dpr, 0, 0, dpr, 0, 0);
+        // Pass DPR scaling via transform param — not setTransform() —
+        // so pdf.js controls the full transform chain and avoids mirroring.
+        const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] as const : undefined;
 
         await page.render({
           canvasContext: context,
           viewport,
+          transform,
         }).promise;
       } catch (err) {
         console.error('Failed to render page:', err);

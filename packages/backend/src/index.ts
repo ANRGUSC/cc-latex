@@ -55,6 +55,62 @@ app.get('/api/status', (_req, res) => {
   res.json({ claudeCliAvailable });
 });
 
+// Browse local directories (for folder picker)
+app.get('/api/browse', (req, res) => {
+  const dir = typeof req.query.dir === 'string' ? req.query.dir : '';
+
+  // No dir → list drive roots on Windows, or '/' on Unix
+  if (!dir) {
+    if (process.platform === 'win32') {
+      try {
+        // List available drive letters
+        const drives: { name: string; path: string }[] = [];
+        for (let code = 65; code <= 90; code++) {
+          const letter = String.fromCharCode(code);
+          const root = `${letter}:\\`;
+          if (fs.existsSync(root)) {
+            drives.push({ name: `${letter}:`, path: root });
+          }
+        }
+        res.json({ path: '', parent: null, entries: drives, sep: path.sep });
+      } catch (err) {
+        res.status(500).json({ error: 'Failed to list drives' });
+      }
+      return;
+    }
+    // Unix — start at /
+    return browseDir('/', res);
+  }
+
+  const resolved = path.resolve(dir);
+  browseDir(resolved, res);
+
+  function browseDir(dirPath: string, r: typeof res) {
+    try {
+      if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
+        r.status(400).json({ error: 'Not a directory' });
+        return;
+      }
+      const entries: { name: string; path: string }[] = [];
+      for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === '$Recycle.Bin' || entry.name === 'System Volume Information') continue;
+        entries.push({ name: entry.name, path: path.join(dirPath, entry.name) });
+      }
+      entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+      const parent = path.dirname(dirPath);
+      r.json({
+        path: dirPath,
+        parent: parent === dirPath ? null : parent,
+        entries,
+        sep: path.sep,
+      });
+    } catch {
+      r.status(500).json({ error: 'Cannot read directory' });
+    }
+  }
+});
+
 // Project directory management
 app.get('/api/project', (_req, res) => {
   res.json({

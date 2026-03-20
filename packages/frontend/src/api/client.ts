@@ -81,6 +81,24 @@ export async function renameFileOrDir(filePath: string, newName: string): Promis
   }
 }
 
+// Browse local directories
+export interface BrowseResult {
+  path: string;
+  parent: string | null;
+  entries: { name: string; path: string }[];
+  sep: string;
+}
+
+export async function browseDirectory(dir?: string): Promise<BrowseResult> {
+  const params = dir ? `?dir=${encodeURIComponent(dir)}` : '';
+  const res = await fetch(`/api/browse${params}`);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(data.error || res.statusText);
+  }
+  return res.json();
+}
+
 // Project management
 export async function fetchProject(): Promise<{ dir: string; name: string }> {
   const res = await fetch('/api/project');
