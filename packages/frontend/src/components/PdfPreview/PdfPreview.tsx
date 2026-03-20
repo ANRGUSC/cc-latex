@@ -17,6 +17,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 
 export default function PdfPreview() {
   const pdfUrl = useAppStore((s) => s.pdfUrl);
+  const pdfVersion = useAppStore((s) => s.pdfVersion);
   const isCompiling = useAppStore((s) => s.isCompiling);
   const activeFilePath = useAppStore((s) => s.activeFilePath);
   const activeFileContent = useAppStore((s) => s.activeFileContent);
@@ -31,6 +32,7 @@ export default function PdfPreview() {
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.2);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadCount, setLoadCount] = useState(0);
 
   const renderPage = useCallback(
     async (pageNum: number) => {
@@ -64,7 +66,7 @@ export default function PdfPreview() {
     [scale]
   );
 
-  // Load PDF when pdfUrl changes
+  // Load PDF when pdfUrl or pdfVersion changes
   useEffect(() => {
     if (!pdfUrl) return;
 
@@ -94,6 +96,7 @@ export default function PdfPreview() {
       } finally {
         if (!cancelled) {
           setIsLoading(false);
+          setLoadCount((c) => c + 1);
         }
       }
     }
@@ -103,14 +106,14 @@ export default function PdfPreview() {
     return () => {
       cancelled = true;
     };
-  }, [pdfUrl]);
+  }, [pdfUrl, pdfVersion]);
 
-  // Render current page when page or scale changes
+  // Render current page when page, scale, or load changes
   useEffect(() => {
     if (pdfDocRef.current && currentPage > 0) {
       renderPage(currentPage);
     }
-  }, [currentPage, scale, renderPage]);
+  }, [currentPage, scale, renderPage, loadCount]);
 
   // Re-render on container resize
   useEffect(() => {
@@ -133,9 +136,8 @@ export default function PdfPreview() {
         await saveFile(activeFilePath, activeFileContent);
         setDirty(false);
       }
-      // Pass the active .tex file as a hint; backend auto-detects if not provided
-      const mainFile = activeFilePath?.endsWith('.tex') ? activeFilePath : undefined;
-      await compile(mainFile);
+      // Always let backend auto-detect the main file (the one with \documentclass)
+      await compile();
     } catch (err) {
       console.error('Compile failed:', err);
     }
@@ -200,17 +202,22 @@ export default function PdfPreview() {
           alignItems: pdfUrl ? 'flex-start' : 'center',
           padding: pdfUrl ? 8 : 0,
           backgroundColor: pdfUrl ? 'var(--bg-secondary)' : 'transparent',
+          position: 'relative',
         }}
       >
-        {isLoading || isCompiling ? (
+        {(isLoading || isCompiling) && (
           <div
             style={{
+              position: 'absolute',
+              inset: 0,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: 12,
               color: 'var(--text-muted)',
-              padding: 32,
+              backgroundColor: 'rgba(30, 30, 46, 0.85)',
+              zIndex: 1,
             }}
           >
             <Loader2
@@ -222,7 +229,8 @@ export default function PdfPreview() {
               {isCompiling ? 'Compiling...' : 'Loading PDF...'}
             </span>
           </div>
-        ) : pdfUrl ? (
+        )}
+        {pdfUrl ? (
           <canvas
             ref={canvasRef}
             style={{
@@ -231,21 +239,23 @@ export default function PdfPreview() {
             }}
           />
         ) : (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 8,
-              color: 'var(--text-muted)',
-            }}
-          >
-            <FileOutput size={32} strokeWidth={1} />
-            <span style={{ fontSize: 13 }}>No PDF yet</span>
-            <span style={{ fontSize: 12 }}>
-              Click Compile or press Ctrl+Shift+B
-            </span>
-          </div>
+          !isLoading && !isCompiling && (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 8,
+                color: 'var(--text-muted)',
+              }}
+            >
+              <FileOutput size={32} strokeWidth={1} />
+              <span style={{ fontSize: 13 }}>No PDF yet</span>
+              <span style={{ fontSize: 12 }}>
+                Click Compile or press Ctrl+Shift+B
+              </span>
+            </div>
+          )
         )}
       </div>
 

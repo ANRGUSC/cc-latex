@@ -34,7 +34,7 @@ export function useWebSocket() {
             case 'compilation:complete':
               setCompiling(false);
               setCompilationResult(msg.data);
-              if (msg.data.success && msg.data.pdfPath) {
+              if (msg.data.pdfPath) {
                 setPdfUrl(msg.data.pdfPath);
               }
               break;

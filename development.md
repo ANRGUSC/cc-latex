@@ -7,6 +7,11 @@
 - `/:path+` (Express 4) → `/*path` (Express 5)
 - **Critical**: Wildcard params in Express 5 return **arrays**, not strings. Must `Array.isArray()` check and `.join('/')` to reconstruct the path.
 
+### microtype Package + MiKTeX
+- `\usepackage{microtype}` causes a fatal "auto expansion is only possible with scalable fonts" error with MiKTeX's default Computer Modern fonts
+- Use `\usepackage{lmodern}` instead — Latin Modern fonts are scalable and look better
+- Never use `microtype` without scalable fonts in demo/template documents
+
 ### MiKTeX on Windows
 - MiKTeX installs to `%LOCALAPPDATA%\Programs\MiKTeX\miktex\bin\x64\` but does NOT automatically add itself to PATH
 - Must check known install locations as fallback when `pdflatex` isn't on PATH

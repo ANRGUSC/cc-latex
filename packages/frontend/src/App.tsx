@@ -35,8 +35,8 @@ export default function App() {
         await saveFile(activeFilePath, activeFileContent);
         setDirty(false);
       }
-      const mainFile = activeFilePath?.endsWith('.tex') ? activeFilePath : undefined;
-      await compile(mainFile);
+      // Always let backend auto-detect the main file (the one with \documentclass)
+      await compile();
     } catch (err) {
       console.error('Failed to compile:', err);
     }

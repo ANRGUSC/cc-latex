@@ -19,6 +19,7 @@ interface AppState {
   setCompilationResult: (result: CompilationResult) => void;
 
   pdfUrl: string | null;
+  pdfVersion: number;
   setPdfUrl: (url: string | null) => void;
 
   projectName: string;
@@ -48,7 +49,8 @@ export const useAppStore = create<AppState>((set) => ({
   setCompilationResult: (result) => set({ lastCompilation: result }),
 
   pdfUrl: null,
-  setPdfUrl: (url) => set({ pdfUrl: url }),
+  pdfVersion: 0,
+  setPdfUrl: (url) => set((state) => ({ pdfUrl: url, pdfVersion: state.pdfVersion + 1 })),
 
   projectName: 'cc-latex',
   setProjectName: (name) => set({ projectName: name }),

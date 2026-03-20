@@ -13,6 +13,13 @@ const IGNORED_PATTERNS = [
   '**/*.synctex.gz',
   '**/*.fls',
   '**/*.fdb_latexmk',
+  '**/*.out',
+  '**/*.toc',
+  '**/*.lof',
+  '**/*.lot',
+  '**/*.bbl',
+  '**/*.blg',
+  '**/*.pdf',
 ];
 
 export function setupWatcher(projectDir: string, wss: WebSocketServer): void {
