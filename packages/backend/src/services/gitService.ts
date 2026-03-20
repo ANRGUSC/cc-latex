@@ -1,11 +1,66 @@
 import { spawn, execSync } from 'node:child_process';
 import path from 'node:path';
+import fs from 'node:fs';
 import type { GitRepoInfo, GitSyncStatus } from 'cc-latex-shared';
 import type { WebSocketServer } from 'ws';
 
+const LATEX_GITIGNORE = `# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
+*.pdf
+
+# Windows reserved device names
+nul
+NUL
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*~
+`;
+
+/**
+ * Ensure the project has a .gitignore with LaTeX exclusions.
+ * Creates one if missing; appends critical entries if they're absent.
+ */
+function ensureGitignore(projectDir: string): void {
+  const gitignorePath = path.join(projectDir, '.gitignore');
+  if (!fs.existsSync(gitignorePath)) {
+    fs.writeFileSync(gitignorePath, LATEX_GITIGNORE, 'utf-8');
+    return;
+  }
+  // If .gitignore exists, make sure 'nul' and '*.aux' are in it
+  const content = fs.readFileSync(gitignorePath, 'utf-8');
+  const additions: string[] = [];
+  if (!content.includes('nul') && !content.includes('NUL')) {
+    additions.push('nul', 'NUL');
+  }
+  if (!content.includes('*.aux')) {
+    additions.push('*.aux', '*.log', '*.out', '*.synctex.gz', '*.fls', '*.fdb_latexmk');
+  }
+  if (additions.length > 0) {
+    fs.appendFileSync(gitignorePath, '\n# Auto-added by cc-latex\n' + additions.join('\n') + '\n', 'utf-8');
+  }
+}
+
 function run(cmd: string, args: string[], cwd: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { cwd, shell: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    const proc = spawn(cmd, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     proc.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
@@ -177,7 +232,10 @@ export async function cloneRepo(
 }
 
 export async function commitAndPush(projectDir: string, message: string): Promise<void> {
-  await run('git', ['add', '-A'], projectDir);
+  // Ensure .gitignore exists with LaTeX exclusions + Windows reserved names
+  ensureGitignore(projectDir);
+
+  await run('git', ['add', '.'], projectDir);
   await run('git', ['commit', '-m', message], projectDir);
 
   const info = await getRepoInfo(projectDir);

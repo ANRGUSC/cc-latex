@@ -42,25 +42,28 @@ export default function PdfPreview() {
 
       try {
         const page = await pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({ scale });
+        const dpr = window.devicePixelRatio || 1;
+
+        // Bake DPR into viewport scale so pdf.js owns the entire transform.
+        // Canvas is at physical resolution; CSS shrinks to logical size.
+        const cssViewport = page.getViewport({ scale });
+        const hiDpiViewport = page.getViewport({ scale: scale * dpr });
+
         const context = canvas.getContext('2d');
         if (!context) return;
 
-        // Use devicePixelRatio for sharp rendering
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = Math.floor(viewport.width * dpr);
-        canvas.height = Math.floor(viewport.height * dpr);
-        canvas.style.width = `${Math.floor(viewport.width)}px`;
-        canvas.style.height = `${Math.floor(viewport.height)}px`;
+        canvas.width = Math.floor(hiDpiViewport.width);
+        canvas.height = Math.floor(hiDpiViewport.height);
+        canvas.style.width = `${Math.floor(cssViewport.width)}px`;
+        canvas.style.height = `${Math.floor(cssViewport.height)}px`;
 
-        // Pass DPR scaling via transform param — not setTransform() —
-        // so pdf.js controls the full transform chain and avoids mirroring.
-        const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] as const : undefined;
+        // Reset context to clean state before every render
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, canvas.width, canvas.height);
 
         await page.render({
           canvasContext: context,
-          viewport,
-          transform,
+          viewport: hiDpiViewport,
         }).promise;
       } catch (err) {
         console.error('Failed to render page:', err);
