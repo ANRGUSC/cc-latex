@@ -5,10 +5,19 @@ import {
   Download,
   Circle,
   Loader2,
+  Link,
+  Pencil,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useToastStore } from '../../stores/toastStore';
-import { fetchGitCheck, fetchGitStatus, gitClone, gitPush, gitPull } from '../../api/client';
+import { fetchGitCheck, fetchGitStatus, gitClone, gitSetRemote, gitPush, gitPull } from '../../api/client';
+
+/** Extract "owner/repo" from a GitHub URL */
+function shortRemote(url: string | null): string {
+  if (!url) return '';
+  const m = url.match(/github\.com[/:](.+?\/.+?)(?:\.git)?$/);
+  return m ? m[1] : url;
+}
 
 export default function GitPanel() {
   const gitInfo = useAppStore((s) => s.gitInfo);
@@ -17,27 +26,33 @@ export default function GitPanel() {
   const setGitAvailable = useAppStore((s) => s.setGitAvailable);
   const isGitOperationRunning = useAppStore((s) => s.isGitOperationRunning);
   const setGitOperationRunning = useAppStore((s) => s.setGitOperationRunning);
+  const projectDir = useAppStore((s) => s.projectDir);
 
-  const [cloneOwner, setCloneOwner] = useState('');
-  const [cloneRepo, setCloneRepo] = useState('');
+  const [remoteInput, setRemoteInput] = useState('');
+  const [editingRemote, setEditingRemote] = useState(false);
   const [commitMsg, setCommitMsg] = useState('');
   const [showPush, setShowPush] = useState(false);
 
+  // Refresh git status when project directory changes
   useEffect(() => {
     fetchGitCheck()
-      .then(({ gitAvailable }) => {
-        setGitAvailable(gitAvailable);
-        if (gitAvailable) {
-          fetchGitStatus().then(setGitInfo).catch(() => {});
+      .then(({ gitAvailable: avail }) => {
+        setGitAvailable(avail);
+        if (avail) {
+          fetchGitStatus().then(setGitInfo).catch(() => setGitInfo(null));
         }
       })
       .catch(() => {});
-  }, [setGitAvailable, setGitInfo]);
+  }, [setGitAvailable, setGitInfo, projectDir]);
 
   if (!gitAvailable) return null;
 
+  const hasRepo = gitInfo?.initialized;
+  const hasRemote = hasRepo && !!gitInfo?.remote;
+  const remoteShort = shortRemote(gitInfo?.remote ?? null);
+
   const statusColor =
-    !gitInfo || !gitInfo.initialized
+    !gitInfo || !hasRepo
       ? 'var(--text-muted)'
       : gitInfo.syncStatus === 'clean' && !gitInfo.hasUncommittedChanges
         ? 'var(--success)'
@@ -45,18 +60,28 @@ export default function GitPanel() {
           ? 'var(--error)'
           : 'var(--warning)';
 
-  const handleClone = async () => {
-    if (!cloneOwner || !cloneRepo) return;
+  const handleSetRemote = async () => {
+    const trimmed = remoteInput.trim();
+    if (!trimmed.includes('/')) return;
+    const [owner, repo] = trimmed.split('/');
     setGitOperationRunning(true);
-    const result = await gitClone(cloneOwner, cloneRepo);
-    setGitOperationRunning(false);
-    if (result.success) {
-      useToastStore.getState().addToast({ message: result.message, type: 'success' });
-      if (result.status) setGitInfo(result.status);
-      setCloneOwner('');
-      setCloneRepo('');
-    } else {
-      useToastStore.getState().addToast({ message: result.message, type: 'error' });
+    try {
+      const result = hasRepo
+        ? await gitSetRemote(owner, repo)
+        : await gitClone(owner, repo);
+      if (result.success) {
+        useToastStore.getState().addToast({ message: result.message, type: 'success' });
+        if (result.status) setGitInfo(result.status);
+        setRemoteInput('');
+        setEditingRemote(false);
+      } else {
+        useToastStore.getState().addToast({ message: result.message, type: 'error' });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed';
+      useToastStore.getState().addToast({ message: msg, type: 'error' });
+    } finally {
+      setGitOperationRunning(false);
     }
   };
 
@@ -96,6 +121,7 @@ export default function GitPanel() {
         flexShrink: 0,
       }}
     >
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
         <GitBranch size={13} color="var(--text-secondary)" />
         <span style={{ fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: 10, letterSpacing: 0.5 }}>
@@ -112,22 +138,76 @@ export default function GitPanel() {
         )}
       </div>
 
-      {gitInfo?.initialized && gitInfo.remote ? (
+      {/* Remote display / edit */}
+      {hasRemote && !editingRemote ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+          <Link size={10} style={{ flexShrink: 0, opacity: 0.5 }} />
+          <span style={{
+            color: 'var(--text-muted)',
+            fontSize: 10,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            flex: 1,
+          }}>
+            {remoteShort}
+          </span>
+          <button
+            className="btn-icon"
+            onClick={() => { setEditingRemote(true); setRemoteInput(remoteShort); }}
+            title="Change remote"
+            style={{ padding: 1 }}
+          >
+            <Pencil size={10} />
+          </button>
+        </div>
+      ) : null}
+
+      {/* Remote input — shown when: no remote, or editing remote */}
+      {(!hasRemote || editingRemote) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>
+            {hasRepo ? 'Set GitHub remote' : 'Connect a GitHub repo'}
+          </span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <input
+              value={remoteInput}
+              onChange={(e) => setRemoteInput(e.target.value)}
+              placeholder="owner/repo"
+              style={{ flex: 1, fontSize: 11, padding: '3px 6px' }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSetRemote(); if (e.key === 'Escape') setEditingRemote(false); }}
+            />
+            <button
+              className="btn-sm"
+              onClick={handleSetRemote}
+              disabled={!remoteInput.includes('/') || isGitOperationRunning}
+            >
+              {isGitOperationRunning ? <Loader2 size={10} className="spin" /> : 'Set'}
+            </button>
+            {editingRemote && (
+              <button className="btn-sm" onClick={() => setEditingRemote(false)}>Cancel</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Push / Pull — show when remote is configured */}
+      {hasRemote && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {/* Status line */}
           <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>
-            {gitInfo.hasUncommittedChanges && (
+            {gitInfo!.hasUncommittedChanges && (
               <span style={{ color: 'var(--warning)' }}>
-                {gitInfo.changedFiles.length} changed
+                {gitInfo!.changedFiles.length} changed
               </span>
             )}
-            {gitInfo.aheadCount > 0 && (
-              <span style={{ marginLeft: 6 }}>{gitInfo.aheadCount} ahead</span>
+            {gitInfo!.aheadCount > 0 && (
+              <span style={{ marginLeft: 6 }}>{gitInfo!.aheadCount} ahead</span>
             )}
-            {gitInfo.behindCount > 0 && (
-              <span style={{ marginLeft: 6 }}>{gitInfo.behindCount} behind</span>
+            {gitInfo!.behindCount > 0 && (
+              <span style={{ marginLeft: 6 }}>{gitInfo!.behindCount} behind</span>
             )}
-            {!gitInfo.hasUncommittedChanges && gitInfo.syncStatus === 'clean' && (
+            {!gitInfo!.hasUncommittedChanges && gitInfo!.syncStatus === 'clean' && (
               <span style={{ color: 'var(--success)' }}>up to date</span>
             )}
           </div>
@@ -137,7 +217,7 @@ export default function GitPanel() {
             <button
               className="btn-sm"
               onClick={() => setShowPush(!showPush)}
-              disabled={isGitOperationRunning || !gitInfo.hasUncommittedChanges}
+              disabled={isGitOperationRunning || !gitInfo!.hasUncommittedChanges}
               title="Commit & Push"
               style={{ flex: 1 }}
             >
@@ -161,9 +241,7 @@ export default function GitPanel() {
                 value={commitMsg}
                 onChange={(e) => setCommitMsg(e.target.value)}
                 placeholder="Commit message..."
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handlePush();
-                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handlePush(); }}
                 style={{ flex: 1, fontSize: 11, padding: '3px 6px' }}
               />
               <button
@@ -175,35 +253,6 @@ export default function GitPanel() {
               </button>
             </div>
           )}
-        </div>
-      ) : (
-        /* Clone form */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>
-            Connect a GitHub repo
-          </span>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <input
-              value={cloneOwner}
-              onChange={(e) => setCloneOwner(e.target.value)}
-              placeholder="owner"
-              style={{ flex: 1, fontSize: 11, padding: '3px 6px' }}
-            />
-            <span style={{ color: 'var(--text-muted)', alignSelf: 'center' }}>/</span>
-            <input
-              value={cloneRepo}
-              onChange={(e) => setCloneRepo(e.target.value)}
-              placeholder="repo"
-              style={{ flex: 1, fontSize: 11, padding: '3px 6px' }}
-            />
-          </div>
-          <button
-            className="btn-sm"
-            onClick={handleClone}
-            disabled={!cloneOwner || !cloneRepo || isGitOperationRunning}
-          >
-            Clone
-          </button>
         </div>
       )}
     </div>

@@ -114,30 +114,64 @@ export async function getRepoInfo(projectDir: string): Promise<GitRepoInfo> {
   return info;
 }
 
+export async function setRemote(
+  projectDir: string,
+  owner: string,
+  repo: string
+): Promise<void> {
+  const url = `https://github.com/${owner}/${repo}.git`;
+
+  // Init if not a repo
+  if (!(await isGitRepo(projectDir))) {
+    await run('git', ['init'], projectDir);
+  }
+
+  // Set or update origin
+  try {
+    const existing = await run('git', ['remote', 'get-url', 'origin'], projectDir);
+    if (existing !== url) {
+      await run('git', ['remote', 'set-url', 'origin', url], projectDir);
+    }
+  } catch {
+    // No origin yet — add it
+    await run('git', ['remote', 'add', 'origin', url], projectDir);
+  }
+
+  // Fetch so we know what branches exist on the remote
+  await run('git', ['fetch', 'origin'], projectDir);
+
+  // Set up tracking for the current branch (or default branch)
+  const branch = (await run('git', ['branch', '--show-current'], projectDir).catch(() => '')) || '';
+  if (branch) {
+    try {
+      await run('git', ['branch', '--set-upstream-to', `origin/${branch}`, branch], projectDir);
+    } catch { /* remote branch may not exist yet — that's ok */ }
+  }
+}
+
 export async function cloneRepo(
   projectDir: string,
   owner: string,
   repo: string,
   branch?: string
 ): Promise<void> {
-  // Initialize git repo and set remote
+  const url = `https://github.com/${owner}/${repo}.git`;
   const isRepo = await isGitRepo(projectDir);
-  if (!isRepo) {
-    await run('git', ['init'], projectDir);
+
+  if (isRepo) {
+    // Existing repo — just set the remote and fetch, don't destructively pull
+    await setRemote(projectDir, owner, repo);
+    return;
   }
 
-  // Add remote
-  try {
-    await run('git', ['remote', 'remove', 'origin'], projectDir);
-  } catch { /* no existing remote */ }
-  await run('git', ['remote', 'add', 'origin', `https://github.com/${owner}/${repo}.git`], projectDir);
+  // Fresh directory — init, add remote, pull
+  await run('git', ['init'], projectDir);
+  await run('git', ['remote', 'add', 'origin', url], projectDir);
 
-  // Pull
   const branchArg = branch || 'main';
   try {
     await run('git', ['pull', 'origin', branchArg], projectDir);
   } catch {
-    // Try 'master' as fallback
     await run('git', ['pull', 'origin', 'master'], projectDir);
   }
 }

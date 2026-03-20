@@ -1,7 +1,7 @@
 import { X, Eye, EyeOff, Trash2, FolderOpen, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { switchProject, fetchFileTree, gitClone, fetchGitStatus } from '../../api/client';
+import { switchProject, fetchFileTree, gitSetRemote, gitClone, fetchGitStatus } from '../../api/client';
 import { useToastStore } from '../../stores/toastStore';
 import FolderPicker from './FolderPicker';
 
@@ -30,8 +30,9 @@ export default function SettingsModal({ onClose }: Props) {
   const [showKey, setShowKey] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const gitInfo = useAppStore((s) => s.gitInfo);
   const [repoInput, setRepoInput] = useState('');
-  const [isCloning, setIsCloning] = useState(false);
+  const [isSettingRemote, setIsSettingRemote] = useState(false);
 
   async function handleSwitchProject(dir: string) {
     if (!dir || dir === projectDir) return;
@@ -55,31 +56,33 @@ export default function SettingsModal({ onClose }: Props) {
     }
   }
 
-  async function handleCloneRepo() {
+  async function handleSetRemote() {
     const trimmed = repoInput.trim();
     if (!trimmed.includes('/')) return;
     const [owner, repo] = trimmed.split('/');
-    setIsCloning(true);
+    setIsSettingRemote(true);
     try {
-      const result = await gitClone(owner, repo);
+      const isExistingRepo = gitInfo?.initialized;
+      const result = isExistingRepo
+        ? await gitSetRemote(owner, repo)
+        : await gitClone(owner, repo);
       if (result.success) {
         useToastStore.getState().addToast({ message: result.message, type: 'success' });
         setRepoInput('');
-        // Refresh file tree and git status
         const tree = await fetchFileTree();
         setFileTree(tree);
         try {
-          const gitInfo = await fetchGitStatus();
-          setGitInfo(gitInfo);
+          const info = await fetchGitStatus();
+          setGitInfo(info);
         } catch { /* ignore */ }
       } else {
         useToastStore.getState().addToast({ message: result.message, type: 'error' });
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Clone failed';
+      const msg = err instanceof Error ? err.message : 'Failed to set remote';
       useToastStore.getState().addToast({ message: msg, type: 'error' });
     } finally {
-      setIsCloning(false);
+      setIsSettingRemote(false);
     }
   }
 
@@ -120,9 +123,14 @@ export default function SettingsModal({ onClose }: Props) {
           </div>
         </div>
 
-        {/* GitHub Repo */}
+        {/* GitHub Remote */}
         <div className="modal-section">
-          <div className="modal-section-title">Clone GitHub Repo</div>
+          <div className="modal-section-title">GitHub Remote</div>
+          {gitInfo?.remote ? (
+            <div style={{ fontSize: 12, color: 'var(--text)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {gitInfo.remote.replace(/\.git$/, '').replace(/.*github\.com[/:]/, '')}
+            </div>
+          ) : null}
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             <input
               type="text"
@@ -133,20 +141,22 @@ export default function SettingsModal({ onClose }: Props) {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  handleCloneRepo();
+                  handleSetRemote();
                 }
               }}
             />
             <button
               className="btn-sm"
-              disabled={isCloning || !repoInput.includes('/')}
-              onClick={handleCloneRepo}
+              disabled={isSettingRemote || !repoInput.includes('/')}
+              onClick={handleSetRemote}
             >
-              {isCloning ? <Loader2 size={12} className="spin" /> : 'Clone'}
+              {isSettingRemote ? <Loader2 size={12} className="spin" /> : (gitInfo?.initialized ? 'Set' : 'Clone')}
             </button>
           </div>
           <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-            Clones into the current project directory. Replaces existing files.
+            {gitInfo?.initialized
+              ? 'Set or change the origin remote for this repo.'
+              : 'Initialize git and clone from GitHub.'}
           </span>
         </div>
 

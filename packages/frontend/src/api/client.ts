@@ -141,6 +141,15 @@ export async function gitClone(owner: string, repo: string, branch?: string): Pr
   return res.json();
 }
 
+export async function gitSetRemote(owner: string, repo: string): Promise<GitOperationResult> {
+  const res = await fetch('/api/git/remote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ owner, repo }),
+  });
+  return res.json();
+}
+
 export async function gitPush(message: string): Promise<GitOperationResult> {
   const res = await fetch('/api/git/push', {
     method: 'POST',

@@ -5,6 +5,7 @@ import {
   isGhAvailable,
   getRepoInfo,
   cloneRepo,
+  setRemote,
   commitAndPush,
   pull,
 } from '../services/gitService.js';
@@ -39,7 +40,7 @@ export function gitRouter(projectState: { dir: string }, wss: WebSocketServer): 
     }
   });
 
-  // POST /git/clone — initialize from a GitHub repo
+  // POST /git/clone — initialize or connect a GitHub repo
   router.post('/git/clone', async (req: Request, res: Response) => {
     const { owner, repo, branch } = req.body;
     if (!owner || !repo) {
@@ -50,9 +51,27 @@ export function gitRouter(projectState: { dir: string }, wss: WebSocketServer): 
       await cloneRepo(projectState.dir, owner, repo, branch);
       const status = await getRepoInfo(projectState.dir);
       broadcastStatus();
-      res.json({ success: true, message: `Cloned ${owner}/${repo}`, status });
+      res.json({ success: true, message: `Connected to ${owner}/${repo}`, status });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Clone failed';
+      res.json({ success: false, message: msg });
+    }
+  });
+
+  // POST /git/remote — set or change origin remote
+  router.post('/git/remote', async (req: Request, res: Response) => {
+    const { owner, repo } = req.body;
+    if (!owner || !repo) {
+      res.status(400).json({ success: false, message: 'owner and repo required' });
+      return;
+    }
+    try {
+      await setRemote(projectState.dir, owner, repo);
+      const status = await getRepoInfo(projectState.dir);
+      broadcastStatus();
+      res.json({ success: true, message: `Remote set to ${owner}/${repo}`, status });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to set remote';
       res.json({ success: false, message: msg });
     }
   });
