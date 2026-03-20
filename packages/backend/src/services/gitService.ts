@@ -153,7 +153,22 @@ export async function commitAndPush(projectDir: string, message: string): Promis
 }
 
 export async function pull(projectDir: string): Promise<void> {
-  await run('git', ['pull'], projectDir);
+  try {
+    await run('git', ['pull'], projectDir);
+  } catch (err) {
+    // If no tracking branch, detect branch and pull explicitly from origin
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('no tracking information') || msg.includes('specify which branch')) {
+      const branch = (await run('git', ['branch', '--show-current'], projectDir)) || 'main';
+      await run('git', ['pull', 'origin', branch], projectDir);
+      // Set upstream so future pulls work without specifying
+      try {
+        await run('git', ['branch', '--set-upstream-to', `origin/${branch}`, branch], projectDir);
+      } catch { /* best effort */ }
+    } else {
+      throw err;
+    }
+  }
 }
 
 let pollInterval: ReturnType<typeof setInterval> | null = null;
