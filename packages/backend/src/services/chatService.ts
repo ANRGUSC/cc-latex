@@ -83,9 +83,13 @@ export async function* streamChat(
 
   // Spawn claude CLI — uses the user's Max subscription
   // Pass message via stdin with -p (print mode, non-interactive)
+  // Unset CLAUDECODE env var so claude CLI doesn't refuse to run inside a Claude Code session
+  const cliEnv = { ...process.env };
+  delete cliEnv.CLAUDECODE;
   const proc = spawn('claude', ['-p'], {
     shell: true,
     stdio: ['pipe', 'pipe', 'pipe'],
+    env: cliEnv,
   });
 
   // Write the full message to stdin

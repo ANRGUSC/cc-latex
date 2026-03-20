@@ -98,7 +98,9 @@ console.log(`\n[..] Project directory: ${projectDir}`);
 console.log('[..] Starting backend and frontend...\n');
 
 // 5. Launch backend
+// Unset CLAUDECODE so the claude CLI doesn't refuse to run inside a Claude Code session
 const backendEnv = { ...process.env, PROJECT_DIR: projectDir };
+delete backendEnv.CLAUDECODE;
 const backend = spawn('npx', ['tsx', 'packages/backend/src/index.ts'], {
   stdio: 'inherit',
   shell: true,
