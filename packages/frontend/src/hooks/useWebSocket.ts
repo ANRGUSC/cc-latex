@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { useToastStore } from '../stores/toastStore';
 import type { WSMessage } from 'cc-latex-shared';
 
 export function useWebSocket() {
@@ -10,6 +11,8 @@ export function useWebSocket() {
   const setCompilationResult = useAppStore((s) => s.setCompilationResult);
   const setPdfUrl = useAppStore((s) => s.setPdfUrl);
   const setFileTree = useAppStore((s) => s.setFileTree);
+  const setWsConnected = useAppStore((s) => s.setWsConnected);
+  const setGitInfo = useAppStore((s) => s.setGitInfo);
 
   useEffect(() => {
     function connect() {
@@ -20,6 +23,7 @@ export function useWebSocket() {
 
       ws.onopen = () => {
         console.log('[WS] Connected');
+        setWsConnected(true);
       };
 
       ws.onmessage = (event) => {
@@ -37,6 +41,21 @@ export function useWebSocket() {
               if (msg.data.pdfPath) {
                 setPdfUrl(msg.data.pdfPath);
               }
+              if (msg.data.success) {
+                useToastStore.getState().addToast({
+                  message: `Compiled successfully (${msg.data.duration}ms)`,
+                  type: 'success',
+                  duration: 3000,
+                });
+              } else {
+                useToastStore.getState().addToast({
+                  message: `Compilation failed: ${msg.data.errors.length} error(s)`,
+                  type: 'error',
+                  duration: 5000,
+                });
+                // Switch to output tab on error
+                useAppStore.getState().setBottomPanelTab('output');
+              }
               break;
 
             case 'file:tree-updated':
@@ -45,6 +64,24 @@ export function useWebSocket() {
 
             case 'file:changed':
               // File change events can trigger other UI updates if needed
+              // Auto-compile on save if enabled
+              if (msg.data.event === 'change' && useAppStore.getState().autoCompile) {
+                const filePath = msg.data.path;
+                if (filePath.endsWith('.tex') || filePath.endsWith('.sty') || filePath.endsWith('.cls')) {
+                  // Debounce by checking if already compiling
+                  if (!useAppStore.getState().isCompiling) {
+                    fetch('/api/compile', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({}),
+                    }).catch(() => {});
+                  }
+                }
+              }
+              break;
+
+            case 'git:status-updated':
+              setGitInfo(msg.data);
               break;
 
             case 'error':
@@ -59,6 +96,7 @@ export function useWebSocket() {
       ws.onclose = () => {
         console.log('[WS] Disconnected, reconnecting in 2s...');
         wsRef.current = null;
+        setWsConnected(false);
         reconnectTimerRef.current = setTimeout(connect, 2000);
       };
 
@@ -80,5 +118,5 @@ export function useWebSocket() {
         wsRef.current = null;
       }
     };
-  }, [setCompiling, setCompilationResult, setPdfUrl, setFileTree]);
+  }, [setCompiling, setCompilationResult, setPdfUrl, setFileTree, setWsConnected, setGitInfo]);
 }

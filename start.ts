@@ -59,8 +59,23 @@ try {
   execSync('claude --version', { stdio: 'ignore' });
   console.log('[OK] claude CLI found (using Max subscription for AI chat)');
 } catch {
-  console.log('[!!] claude CLI not found. AI chat will not work.');
-  console.log('     Install from: https://claude.ai/claude-code');
+  console.log('[!!] claude CLI not found. Use API key mode in Settings, or install from: https://claude.ai/claude-code');
+}
+
+// 2b. Check git
+try {
+  execSync('git --version', { stdio: 'ignore' });
+  console.log('[OK] git found');
+} catch {
+  console.log('[..] git not found — GitHub sync will be unavailable');
+}
+
+// 2c. Check gh CLI
+try {
+  execSync('gh --version', { stdio: 'ignore' });
+  console.log('[OK] gh CLI found');
+} catch {
+  console.log('[..] gh CLI not found — GitHub operations will use HTTPS fallback');
 }
 
 // 3. Create project directory if needed

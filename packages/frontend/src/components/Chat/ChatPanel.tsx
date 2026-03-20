@@ -106,7 +106,10 @@ export default function ChatPanel() {
         timestamp: m.timestamp,
       }));
 
-      for await (const chunk of streamChat(text, chatHistory, context)) {
+      const appState = useAppStore.getState();
+      const chatApiKey = appState.aiMode === 'apikey' ? appState.apiKey : undefined;
+
+      for await (const chunk of streamChat(text, chatHistory, context, chatApiKey)) {
         appendToLastMessage(chunk);
       }
 
@@ -179,32 +182,6 @@ export default function ChatPanel() {
 
   return (
     <>
-      <div className="panel-header">
-        <MessageSquare size={14} className="header-icon" />
-        <span>AI Assistant</span>
-        <span
-          style={{
-            fontSize: 10,
-            color: 'var(--text-muted)',
-            fontWeight: 400,
-            textTransform: 'none',
-            letterSpacing: 0,
-          }}
-        >
-          Ask about LaTeX, fix errors, or request edits
-        </span>
-        <div className="header-actions">
-          <button
-            className="btn-sm"
-            onClick={clearMessages}
-            title="Clear chat"
-            disabled={messages.length === 0}
-          >
-            <Trash2 size={11} />
-          </button>
-        </div>
-      </div>
-
       <div
         style={{
           flex: 1,
@@ -282,6 +259,15 @@ export default function ChatPanel() {
           style={{ height: 36, paddingLeft: 10, paddingRight: 10 }}
         >
           <Send size={13} />
+        </button>
+        <button
+          className="btn-icon"
+          onClick={clearMessages}
+          title="Clear chat"
+          disabled={messages.length === 0}
+          style={{ height: 36 }}
+        >
+          <Trash2 size={13} />
         </button>
       </div>
     </>

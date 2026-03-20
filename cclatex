@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# cclatex — launch the cc-latex web-based LaTeX IDE
+# Usage: ./cclatex [project-directory]
+#
+# Prerequisites: Node.js 18+, npm
+# Optional: pdflatex (MiKTeX/TeX Live), claude CLI, git, gh
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Install dependencies if needed
+if [ ! -d "node_modules" ]; then
+  echo "[..] Installing dependencies..."
+  npm install
+fi
+
+# Launch
+exec npx tsx start.ts "$@"

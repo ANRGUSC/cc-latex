@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import Anthropic from '@anthropic-ai/sdk';
 import type { FileNode } from 'cc-latex-shared';
 
 interface ChatContext {
@@ -112,5 +113,54 @@ export async function* streamChat(
 
   if (!hasOutput && exitCode !== 0) {
     yield `Error running claude CLI (exit code ${exitCode}): ${stderr || 'Make sure "claude" is installed and you are logged in with your Max subscription.'}`;
+  }
+}
+
+export async function* streamChatWithApiKey(
+  apiKey: string,
+  userMessage: string,
+  context?: ChatContext,
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>
+): AsyncGenerator<string, void, unknown> {
+  const client = new Anthropic({ apiKey });
+
+  const contextStr = buildContext(context);
+  let systemPrompt = SYSTEM_INSTRUCTIONS;
+  if (contextStr) {
+    systemPrompt += `\n\n[Context]${contextStr}`;
+  }
+
+  // Build messages array
+  const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  if (history && history.length > 0) {
+    for (const msg of history) {
+      messages.push({ role: msg.role, content: msg.content });
+    }
+  }
+  messages.push({ role: 'user', content: userMessage });
+
+  try {
+    const stream = await client.messages.stream({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages,
+    });
+
+    for await (const event of stream) {
+      if (
+        event.type === 'content_block_delta' &&
+        event.delta.type === 'text_delta'
+      ) {
+        yield event.delta.text;
+      }
+    }
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 401) {
+      yield 'Error: Invalid API key. Please check your Anthropic API key in Settings.';
+    } else {
+      const msg = err instanceof Error ? err.message : 'API request failed';
+      yield `Error: ${msg}`;
+    }
   }
 }

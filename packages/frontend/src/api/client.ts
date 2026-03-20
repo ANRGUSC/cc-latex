@@ -1,4 +1,4 @@
-import type { FileNode, CompilationResult, ChatMessage } from 'cc-latex-shared';
+import type { FileNode, CompilationResult, ChatMessage, GitRepoInfo, GitOperationResult } from 'cc-latex-shared';
 
 export async function fetchFileTree(): Promise<FileNode> {
   const res = await fetch('/api/files');
@@ -35,6 +35,89 @@ export async function compile(mainFile?: string): Promise<CompilationResult> {
   return res.json();
 }
 
+// Status endpoint
+export async function fetchStatus(): Promise<{ claudeCliAvailable: boolean }> {
+  const res = await fetch('/api/status');
+  if (!res.ok) throw new Error(`Status fetch failed: ${res.statusText}`);
+  return res.json();
+}
+
+// File operations
+export async function createFileOrDir(
+  path: string,
+  type: 'file' | 'directory',
+  content?: string
+): Promise<void> {
+  const res = await fetch('/api/files', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, type, content }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(data.error || res.statusText);
+  }
+}
+
+export async function deleteFileOrDir(filePath: string): Promise<void> {
+  const safePath = filePath.split('/').map(encodeURIComponent).join('/');
+  const res = await fetch(`/api/files/${safePath}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(data.error || res.statusText);
+  }
+}
+
+export async function renameFileOrDir(filePath: string, newName: string): Promise<void> {
+  const safePath = filePath.split('/').map(encodeURIComponent).join('/');
+  const res = await fetch(`/api/files/${safePath}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newName }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(data.error || res.statusText);
+  }
+}
+
+// Git operations
+export async function fetchGitCheck(): Promise<{ gitAvailable: boolean; ghAvailable: boolean }> {
+  const res = await fetch('/api/git/check');
+  if (!res.ok) throw new Error('Git check failed');
+  return res.json();
+}
+
+export async function fetchGitStatus(): Promise<GitRepoInfo> {
+  const res = await fetch('/api/git/status');
+  if (!res.ok) throw new Error('Git status failed');
+  return res.json();
+}
+
+export async function gitClone(owner: string, repo: string, branch?: string): Promise<GitOperationResult> {
+  const res = await fetch('/api/git/clone', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ owner, repo, branch }),
+  });
+  return res.json();
+}
+
+export async function gitPush(message: string): Promise<GitOperationResult> {
+  const res = await fetch('/api/git/push', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  return res.json();
+}
+
+export async function gitPull(): Promise<GitOperationResult> {
+  const res = await fetch('/api/git/pull', { method: 'POST' });
+  return res.json();
+}
+
+// Chat
 interface ChatContext {
   activeFilePath?: string | null;
   activeFileContent?: string;
@@ -45,20 +128,28 @@ interface ChatContext {
 export async function* streamChat(
   message: string,
   history: ChatMessage[],
-  context: ChatContext
+  context: ChatContext,
+  apiKey?: string
 ): AsyncGenerator<string> {
   // Transform context to match backend's expected format
   const backendContext = {
-    fileTree: undefined, // Backend will use fileTreeSummary if we add it to system prompt
+    fileTree: undefined,
     currentFile: context.activeFilePath
       ? { path: context.activeFilePath, content: context.activeFileContent || '' }
       : undefined,
     compilationErrors: context.compilationErrors,
   };
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (apiKey) {
+    headers['x-anthropic-api-key'] = apiKey;
+  }
+
   const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       message,
       history: history.map((m) => ({ role: m.role, content: m.content })),

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { streamChat } from '../services/chatService.js';
+import { streamChat, streamChatWithApiKey } from '../services/chatService.js';
 
 export function chatRouter(projectDir: string): Router {
   const router = Router();
@@ -19,8 +19,13 @@ export function chatRouter(projectDir: string): Router {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
+    // Check for API key header — use Anthropic API if present
+    const apiKey = req.headers['x-anthropic-api-key'] as string | undefined;
+
     try {
-      const stream = streamChat(message, context, history);
+      const stream = apiKey
+        ? streamChatWithApiKey(apiKey, message, context, history)
+        : streamChat(message, context, history);
 
       for await (const chunk of stream) {
         res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);

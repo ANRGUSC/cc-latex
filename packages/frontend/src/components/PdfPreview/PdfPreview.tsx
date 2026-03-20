@@ -216,7 +216,7 @@ export default function PdfPreview() {
               justifyContent: 'center',
               gap: 12,
               color: 'var(--text-muted)',
-              backgroundColor: 'rgba(30, 30, 46, 0.85)',
+              backgroundColor: 'var(--bg-overlay)',
               zIndex: 1,
             }}
           >
@@ -259,12 +259,7 @@ export default function PdfPreview() {
         )}
       </div>
 
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+{/* spin keyframes defined in global.css */}
     </>
   );
 }

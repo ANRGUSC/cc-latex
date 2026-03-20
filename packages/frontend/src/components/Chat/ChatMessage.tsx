@@ -123,9 +123,9 @@ export default function ChatMessageComponent({ message }: Props) {
             ? '12px 12px 2px 12px'
             : '12px 12px 12px 2px',
           background: isUser
-            ? 'rgba(137, 180, 250, 0.2)'
+            ? 'var(--accent-bg)'
             : 'var(--bg-surface)',
-          border: `1px solid ${isUser ? 'rgba(137, 180, 250, 0.3)' : 'var(--border)'}`,
+          border: `1px solid ${isUser ? 'var(--accent-border)' : 'var(--border)'}`,
           fontSize: 12,
           lineHeight: 1.6,
           wordBreak: 'break-word',

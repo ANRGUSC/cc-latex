@@ -62,7 +62,7 @@ export function buildFileTree(dir: string, rootDir?: string): FileNode {
   return node;
 }
 
-function resolveAndGuard(projectDir: string, relativePath: string): string {
+export function resolveAndGuard(projectDir: string, relativePath: string): string {
   const resolved = path.resolve(projectDir, relativePath);
   const normalizedProject = path.resolve(projectDir);
   if (!resolved.startsWith(normalizedProject + path.sep) && resolved !== normalizedProject) {
@@ -86,4 +86,41 @@ export function writeFile(projectDir: string, relativePath: string, content: str
   const dir = path.dirname(resolved);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(resolved, content, 'utf-8');
+}
+
+export function deleteFile(projectDir: string, relativePath: string): void {
+  const resolved = resolveAndGuard(projectDir, relativePath);
+  if (!fs.existsSync(resolved)) {
+    const err = new Error('File not found') as NodeJS.ErrnoException;
+    err.code = 'ENOENT';
+    throw err;
+  }
+  const stat = fs.statSync(resolved);
+  if (stat.isDirectory()) {
+    fs.rmSync(resolved, { recursive: true });
+  } else {
+    fs.unlinkSync(resolved);
+  }
+}
+
+export function createDirectory(projectDir: string, relativePath: string): void {
+  const resolved = resolveAndGuard(projectDir, relativePath);
+  fs.mkdirSync(resolved, { recursive: true });
+}
+
+export function renameFile(projectDir: string, relativePath: string, newName: string): void {
+  const resolved = resolveAndGuard(projectDir, relativePath);
+  if (!fs.existsSync(resolved)) {
+    const err = new Error('File not found') as NodeJS.ErrnoException;
+    err.code = 'ENOENT';
+    throw err;
+  }
+  const dir = path.dirname(resolved);
+  const newResolved = path.join(dir, newName);
+  // Guard the new path too
+  const normalizedProject = path.resolve(projectDir);
+  if (!newResolved.startsWith(normalizedProject + path.sep) && newResolved !== normalizedProject) {
+    throw new Error('Path traversal detected');
+  }
+  fs.renameSync(resolved, newResolved);
 }

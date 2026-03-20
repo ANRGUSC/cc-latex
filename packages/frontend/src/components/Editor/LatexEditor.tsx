@@ -9,10 +9,27 @@ import { Code2, Circle, Save, Undo2 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { saveFile } from '../../api/client';
 
+// Light theme for CodeMirror
+const lightTheme = EditorView.theme(
+  {
+    '&': { backgroundColor: '#eff1f5' },
+    '.cm-gutters': { backgroundColor: '#e6e9ef', borderRight: '1px solid #bcc0cc', color: '#8c8fa1' },
+    '.cm-activeLineGutter': { backgroundColor: '#ccd0da' },
+    '.cm-activeLine': { backgroundColor: 'rgba(30, 102, 245, 0.06)' },
+    '.cm-selectionBackground': { backgroundColor: 'rgba(30, 102, 245, 0.15) !important' },
+    '&.cm-focused .cm-selectionBackground': { backgroundColor: 'rgba(30, 102, 245, 0.2) !important' },
+    '.cm-cursor': { borderLeftColor: '#1e66f5' },
+    '.cm-content': { caretColor: '#1e66f5', color: '#4c4f69' },
+    '.cm-line': { color: '#4c4f69' },
+  },
+  { dark: false }
+);
+
 export default function LatexEditor() {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const vimCompartment = useRef(new Compartment());
+  const themeCompartment = useRef(new Compartment());
   const activeFilePath = useAppStore((s) => s.activeFilePath);
   const activeFileContent = useAppStore((s) => s.activeFileContent);
   const isDirty = useAppStore((s) => s.isDirty);
@@ -20,6 +37,10 @@ export default function LatexEditor() {
   const setDirty = useAppStore((s) => s.setDirty);
   const vimMode = useAppStore((s) => s.vimMode);
   const toggleVimMode = useAppStore((s) => s.toggleVimMode);
+  const theme = useAppStore((s) => s.theme);
+  const setCursorPosition = useAppStore((s) => s.setCursorPosition);
+  const editorScrollToLine = useAppStore((s) => s.editorScrollToLine);
+  const setEditorScrollToLine = useAppStore((s) => s.setEditorScrollToLine);
 
   // Refs for current values to avoid stale closures in CodeMirror callbacks
   const activeFilePathRef = useRef(activeFilePath);
@@ -64,6 +85,34 @@ export default function LatexEditor() {
     }
   }, [vimMode]);
 
+  // Reconfigure theme compartment when theme changes
+  useEffect(() => {
+    if (viewRef.current) {
+      viewRef.current.dispatch({
+        effects: themeCompartment.current.reconfigure(
+          theme === 'dark' ? oneDark : lightTheme
+        ),
+      });
+    }
+  }, [theme]);
+
+  // Scroll to line when editorScrollToLine changes
+  useEffect(() => {
+    if (editorScrollToLine && viewRef.current) {
+      const view = viewRef.current;
+      const line = Math.min(editorScrollToLine, view.state.doc.lines);
+      if (line > 0) {
+        const lineInfo = view.state.doc.line(line);
+        view.dispatch({
+          selection: { anchor: lineInfo.from },
+          scrollIntoView: true,
+        });
+        view.focus();
+      }
+      setEditorScrollToLine(null);
+    }
+  }, [editorScrollToLine, setEditorScrollToLine]);
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -97,6 +146,12 @@ export default function LatexEditor() {
         const newContent = update.state.doc.toString();
         updateActiveFileContent(newContent);
       }
+      // Track cursor position
+      if (update.selectionSet || update.docChanged) {
+        const pos = update.state.selection.main.head;
+        const line = update.state.doc.lineAt(pos);
+        setCursorPosition(line.number, pos - line.from + 1);
+      }
     });
 
     const editorTheme = EditorView.theme({
@@ -108,30 +163,18 @@ export default function LatexEditor() {
         fontFamily: 'var(--font-mono)',
         overflow: 'auto',
       },
-      '.cm-content': {
-        caretColor: 'var(--accent)',
-      },
-      '.cm-cursor': {
-        borderLeftColor: 'var(--accent)',
-      },
-      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-        backgroundColor: 'rgba(137, 180, 250, 0.2) !important',
-      },
-      '.cm-gutters': {
-        backgroundColor: 'var(--bg-secondary)',
-        borderRight: '1px solid var(--border)',
-      },
     });
 
-    // Read vimMode at creation time
+    // Read state at creation time
     const currentVimMode = useAppStore.getState().vimMode;
+    const currentTheme = useAppStore.getState().theme;
 
     const state = EditorState.create({
       doc: activeFileContent,
       extensions: [
         vimCompartment.current.of(currentVimMode ? vim() : []),
+        themeCompartment.current.of(currentTheme === 'dark' ? oneDark : lightTheme),
         basicSetup,
-        oneDark,
         keymap.of([indentWithTab]),
         saveKeymap,
         updateListener,
