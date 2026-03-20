@@ -19,6 +19,7 @@ project/
 
 # Claude Code local config
 .claude/
+.claude-journal.md
 
 # Test artifacts
 test_*
