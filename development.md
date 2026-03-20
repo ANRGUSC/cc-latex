@@ -37,6 +37,22 @@
 - Pass message via stdin (not as argument) to avoid shell escaping issues with long prompts
 - System instructions, context, and conversation history all bundled into the stdin payload
 
+### Claude CLI Nested Session Detection
+- When cc-latex is launched from within a Claude Code session (e.g. via `npx tsx start.ts`), the `CLAUDECODE` environment variable is inherited by child processes
+- This causes the spawned `claude -p` CLI to refuse to run with: "Claude Code cannot be launched inside another Claude Code session"
+- **Fix**: Delete `CLAUDECODE` from the env before spawning — both in `start.ts` (backend env) and `chatService.ts` (CLI spawn env)
+- `delete env.CLAUDECODE` is safe; it's only a session detection flag, not needed by the CLI itself
+
+### CSS Variables for Theming
+- Never hardcode `rgba(137, 180, 250, ...)` or similar colors — always use CSS variables like `var(--accent-bg)`, `var(--accent-border)`
+- Both themes (dark/light) define the same variable names with different values in `:root` and `[data-theme="light"]`
+- CodeMirror needs its own theme compartment since it doesn't inherit CSS variables for syntax highlighting — use `Compartment` and reconfigure on theme change
+
+### CodeMirror Theme Compartment Pattern
+- Create a `Compartment` ref for any extension that needs runtime swapping (vim, theme)
+- On state change, dispatch `effects: compartment.reconfigure(newExtension)` — avoids full editor teardown
+- Read initial state from `useAppStore.getState()` at editor creation time to avoid stale closure values
+
 ## Architecture
 
 - Monorepo with npm workspaces: `packages/shared`, `packages/backend`, `packages/frontend`
